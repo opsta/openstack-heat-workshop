@@ -1,0 +1,76 @@
+# This is hard-coded version
+heat_template_version: newton
+
+description: >
+    HOT Templete to create new network name demo-network-2
+    and create new router name demo-router-2
+    and create new security group name ping-ssh-2
+    and create new instance that associates with all above along with
+    floating ip
+
+resources:
+    demo_network:
+        type: OS::Neutron::Net
+        properties:
+            name: demo-network-2
+
+    demo_subnet:
+        type: OS::Neutron::Subnet
+        properties:
+            network: { get_resource: demo_network }
+            cidr: 192.168.2.0/24
+            name: 192.168.2-subnet
+            allocation_pools:
+                - start: 192.168.2.11
+                  end: 192.168.2.250
+            gateway_ip: 192.168.2.1
+            dns_nameservers: [8.8.8.8]
+
+    demo_router:
+        type: OS::Neutron::Router
+        properties:
+            name: demo-router-2
+            external_gateway_info:
+                network: external-network
+
+    demo_router_interface:
+        type: OS::Neutron::RouterInterface
+        properties:
+            router: { get_resource: demo_router }
+            subnet: { get_resource: demo_subnet }
+
+    demo_security_group:
+        type: OS::Neutron::SecurityGroup
+        properties:
+            name: ping-ssh-2
+            rules:
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: tcp
+                  port_range_min: 22
+                  port_range_max: 22
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: icmp
+
+    cirros_first:
+        type: OS::Nova::Server
+        properties:
+            name: cirros-first
+            key_name: root-aio
+            image: cirros-0.3.4-x86_64
+            flavor: c1.m1
+            networks:
+                - port: { get_resource: cirros_first_port }
+
+    cirros_first_port:
+        type: OS::Neutron::Port
+        properties:
+            network_id: { get_resource: demo_network }
+            fixed_ips:
+                - subnet: { get_resource: demo_subnet }
+            security_groups: [{ get_resource: demo_security_group }]
+
+    cirros_first_floating_ip:
+        type: OS::Neutron::FloatingIP
+        properties:
+            floating_network: external-network
+            port_id: { get_resource: cirros_first_port }
