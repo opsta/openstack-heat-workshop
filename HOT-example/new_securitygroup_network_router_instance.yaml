@@ -1,48 +1,102 @@
-# This is hard-coded version
 heat_template_version: newton
 
 description: >
-    HOT Templete to create new network name demo-network-2
-    and create new router name demo-router-2
-    and create new security group name ping-ssh-2
-    and create new instance that associates with all above along with
-    floating ip
+    HOT Templete to create new network, router, security group , and
+    new instance that associates with all above along with floating ip
+
+parameters:
+    network_name:
+        type: string
+        description: Name of private network to be created
+        default: demo-network
+    network_cidr:
+        type: string
+        description: Private network address (CIDR notation)
+        default: 192.168.1.0/24
+    subnet_name:
+        type: string
+        description: Name of subnet to be created
+        default: 192.168.1-subnet
+    allocation_pools_start:
+        type: string
+        description: Start of private network pool
+        default: 192.168.1.11
+    allocation_pools_end:
+        type: string
+        description: End of private network pool
+        default: 192.168.1.250
+    network_gateway:
+        type: string
+        description: Gateway IP of private network
+        default: 192.168.1.1
+    network_dns_nameservers:
+        type: comma_delimited_list
+        description: List of DNS Nameservers
+        default: [8.8.8.8]
+    public_network:
+        type: string
+        description: Name of public network to allocate floating ips
+        default: external-network
+    router_name:
+        type: string
+        description: Name of router to be created
+        default: demo-router
+    security_group_name:
+        type: string
+        description: Name of security group to be created
+        default: ping-ssh
+    instance_name:
+        type: string
+        description: Name of instance to be created
+        default: test-heat
+    key_name:
+        type: string
+        description: Keyname to be paired with new instance
+        default: root-aio
+    image_name:
+        type: string
+        description: Name of image to use for instance creation
+        default: cirros-0.3.4-x86_64
+    flavor_name:
+        type: string
+        description: Name of flavor to use for instance creation
+        default: c1.m1
 
 resources:
-    demo_network:
+    network:
         type: OS::Neutron::Net
         properties:
-            name: demo-network-2
+            name: { get_param: network_name }
 
-    demo_subnet:
+    subnet:
         type: OS::Neutron::Subnet
         properties:
-            network: { get_resource: demo_network }
-            cidr: 192.168.2.0/24
-            name: 192.168.2-subnet
+            network: { get_resource: network }
+            cidr: { get_param: network_cidr }
+            name: { get_param: subnet_name }
             allocation_pools:
-                - start: 192.168.2.11
-                  end: 192.168.2.250
-            gateway_ip: 192.168.2.1
-            dns_nameservers: [8.8.8.8]
+                - start: { get_param: allocation_pools_start }
+                  end: { get_param: allocation_pools_end }
+            gateway_ip: { get_param: network_gateway }
+            dns_nameservers: { get_param: network_dns_nameservers }
 
-    demo_router:
+    router:
         type: OS::Neutron::Router
         properties:
-            name: demo-router-2
+            name: { get_param: router_name }
             external_gateway_info:
-                network: external-network
+                network: { get_param: public_network }
 
-    demo_router_interface:
+    router_interface:
         type: OS::Neutron::RouterInterface
         properties:
-            router: { get_resource: demo_router }
-            subnet: { get_resource: demo_subnet }
+            router: { get_resource: router }
+            subnet: { get_resource: subnet }
 
-    demo_security_group:
+    security_group:
         type: OS::Neutron::SecurityGroup
         properties:
-            name: ping-ssh-2
+            name: { get_param: security_group_name }
             rules:
                 - remote_ip_prefix: 0.0.0.0/0
                   protocol: tcp
@@ -51,26 +105,26 @@ resources:
                 - remote_ip_prefix: 0.0.0.0/0
                   protocol: icmp
 
-    cirros_first:
+    instance:
         type: OS::Nova::Server
         properties:
-            name: cirros-first
-            key_name: root-aio
-            image: cirros-0.3.4-x86_64
-            flavor: c1.m1
+            name: { get_param: instance_name }
+            key_name: { get_param: key_name }
+            image: { get_param: image_name }
+            flavor: { get_param: flavor_name }
             networks:
-                - port: { get_resource: cirros_first_port }
+                - port: { get_resource: instance_port }
 
-    cirros_first_port:
+    instance_port:
         type: OS::Neutron::Port
         properties:
-            network_id: { get_resource: demo_network }
+            network_id: { get_resource: network }
             fixed_ips:
-                - subnet: { get_resource: demo_subnet }
-            security_groups: [{ get_resource: demo_security_group }]
+                - subnet: { get_resource: subnet }
+            security_groups: [{ get_resource: security_group }]
 
-    cirros_first_floating_ip:
+    instance_floating_ip:
         type: OS::Neutron::FloatingIP
         properties:
-            floating_network: external-network
-            port_id: { get_resource: cirros_first_port }
+            floating_network: { get_param: public_network }
+            port_id: { get_resource: instance_port }
