@@ -1,0 +1,222 @@
+heat_template_version: newton
+
+description: >
+    This is HOT Templete to deploy WordPress instance on OpenStack via HEAT orchestration
+    
+parameters:
+    network_name:
+        type: string
+        description: Name of private network to be created
+        default: opsta-network
+    subnet_name:
+        type: string
+        description: Name of subnet to be created
+        default: 192.168.1-subnet
+    network_cidr:
+        type: string
+        description: Private network address (CIDR notation)
+        default: 192.168.1.0/24
+    network_gateway:
+        type: string
+        description: Gateway IP of private network
+        default: 192.168.1.1
+    network_dns_nameservers:
+        type: comma_delimited_list
+        description: List of DNS Nameservers
+        default: 8.8.8.8,8.8.4.4
+    allocation_pools_start:
+        type: string
+        description: Start of private network pool
+        default: 192.168.1.50
+    allocation_pools_end:
+        type: string
+        description: End of private network pool
+        default: 192.168.1.200
+    router_name:
+        type: string
+        description: Name of router to be created
+        default: opsta-router
+    public_network:
+        type: string
+        description: Name of public network to allocate floating ips
+        default: external-network
+    image_name:
+        type: string
+        description: Name of image to use for instance creation
+        default: xenial-server-cloudimg-amd64-20170104
+    flavor_name:
+        type: string
+        description: Name of flavor to use for instance creation
+        default: c1.m1
+    key_name:
+        type: string
+        description: Keyname to be paired with new instance
+        default: root-aio
+    database_name:
+        type: string
+        description: Name of datebase
+        default: wp_database
+    database_password:
+        type: string
+        description: Password of datebase
+        default: OpstaThailand
+    wordpress_username:
+        type: string
+        description: Username of wordpress database
+        default: devops
+    wordpress_password:
+        type: string
+        description: Password of wordpress datebase
+        default: OpstaThailand
+
+
+resources:
+    wp_network:
+        type: OS::Neutron::Net
+        properties:
+            name: { get_param: network_name }
+
+    wp_subnet:
+        type: OS::Neutron::Subnet
+        properties:
+            network: { get_resource: wp_network }
+            cidr: { get_param: network_cidr }
+            name: { get_param: subnet_name }
+            allocation_pools:
+                - start: { get_param: allocation_pools_start }
+                  end: { get_param: allocation_pools_end }
+            gateway_ip: { get_param: network_gateway }
+            dns_nameservers: { get_param: network_dns_nameservers }
+            
+    wp_router:
+        type: OS::Neutron::Router
+        properties:
+            name: { get_param: router_name }
+            external_gateway_info:
+                network: { get_param: public_network }
+                
+    wp_router_interface:
+        type: OS::Neutron::RouterInterface
+        properties:
+            router: { get_resource: wp_router }
+            subnet: { get_resource: wp_subnet }
+
+    wp_security_ping_ssh_group:
+        type: OS::Neutron::SecurityGroup
+        properties:
+            name: opsta-ping-ssh
+            rules:
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: tcp
+                  port_range_min: 22
+                  port_range_max: 22
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: icmp
+    
+    wp_security_http_group:
+        type: OS::Neutron::SecurityGroup
+        properties:
+            name: opsta-http
+            rules:
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: tcp
+                  port_range_min: 80
+                  port_range_max: 80
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: tcp
+                  port_range_min: 443
+                  port_range_max: 443
+      
+    wp_security_mysql_group:
+        type: OS::Neutron::SecurityGroup
+        properties:
+            name: opsta-mysql
+            rules:
+                - remote_ip_prefix: 0.0.0.0/0
+                  protocol: tcp
+                  port_range_min: 3306
+                  port_range_max: 3306
+
+    wp_database:
+      type: OS::Nova::Server
+      properties:
+          name: wp-database
+          key_name: { get_param: key_name }
+          image: { get_param: image_name }
+          flavor: { get_param: flavor_name }
+          networks:
+              - port: { get_resource: wp_database_port }
+          user_data:
+              str_replace:
+                  template: |
+                      #!/bin/bash
+                      echo "mysql-server mysql-server/root_password password $db_password" | sudo debconf-set-selections
+                      echo "mysql-server mysql-server/root_password_again password $db_password" | sudo debconf-set-selections
+                      apt-get install mysql-server -y
+                      mysql -u root -p$db_password -e ' CREATE DATABASE $db_name; '
+                      mysql -u root -p$db_password -e ' CREATE USER $wp_username@"%" IDENTIFIED BY "$wp_password"; '
+                      mysql -u root -p$db_password -e ' GRANT ALL PRIVILEGES ON $db_name.* TO $wp_username@"%"; '
+                      mysql -u root -p$db_password -e ' FLUSH PRIVILEGES; '
+                      sed -i 's/bind-address*/# bind-address/g' /etc/mysql/mysql.conf.d/mysqld.cnf
+                      service mysql restart
+                  params:
+                      $db_name: {get_param: database_name}
+                      $db_password: {get_param: database_password}
+                      $wp_username: {get_param: wordpress_username}
+                      $wp_password: {get_param: wordpress_password}
+
+    wp_instance:
+        type: OS::Nova::Server
+        properties:
+            name: wp-dashboard
+            key_name: { get_param: key_name }
+            image: { get_param: image_name }
+            flavor: { get_param: flavor_name }
+            networks:
+                - port: { get_resource: wp_instance_port }
+            user_data:
+                str_replace:
+                    template: |
+                        #!/bin/bash
+                        apt-get install unzip apache2 php7.0 php7.0-gd php7.0-mysql libapache2-mod-php7.0 -y
+                        wget http://wordpress.org/latest.zip -O /tmp/latest.zip
+                        unzip -q /tmp/latest.zip -d /var/www/html/
+                        chown -R www-data:www-data /var/www/html/wordpress
+                        chmod -R 755 /var/www/html/wordpress
+                        mkdir -p /var/www/html/wordpress/wp-content/uploads
+                        chown -R www-data:www-data /var/www/html/wordpress/wp-content/uploads
+                        systemctl enable apache2
+                        systemctl restart apache2
+                    params:
+                        $db_name: {get_param: database_name}
+    
+    wp_instance_port:
+        type: OS::Neutron::Port
+        properties:
+            network_id: { get_resource: wp_network }
+            fixed_ips:
+                - subnet: { get_resource: wp_subnet }
+            security_groups: [{ get_resource: wp_security_ping_ssh_group }, { get_resource: wp_security_http_group }, { get_resource: wp_security_mysql_group }]
+    
+    wp_database_port:
+        type: OS::Neutron::Port
+        properties:
+            network_id: { get_resource: wp_network }
+            fixed_ips:
+                - subnet: { get_resource: wp_subnet }
+            security_groups: [{ get_resource: wp_security_ping_ssh_group }, { get_resource: wp_security_http_group }, { get_resource: wp_security_mysql_group }]
+    
+    wp_instance_floating_ip:
+        type: OS::Neutron::FloatingIP
+        properties:
+            floating_network: { get_param: public_network }
+            port_id: { get_resource: wp_instance_port }
+
+
+outputs:
+    wp_dashboard_ip:
+        description: Network detail for wordpress dashboard
+        value: { get_attr: [wp_instance, networks, opsta-network] }
+    wp_database_ip:
+        description: Network detail for wordpress database
+        value: { get_attr: [wp_database, networks, opsta-network] }

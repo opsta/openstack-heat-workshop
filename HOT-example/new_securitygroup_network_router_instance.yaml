@@ -32,7 +32,7 @@ parameters:
     network_dns_nameservers:
         type: comma_delimited_list
         description: List of DNS Nameservers
-        default: [8.8.8.8]
+        default: 8.8.8.8,8.8.4.4
     public_network:
         type: string
         description: Name of public network to allocate floating ips
