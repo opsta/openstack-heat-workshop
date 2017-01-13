@@ -1,7 +1,7 @@
 heat_template_version: newton
 
 description: >
-    This is HOT Templete to deploy WordPress instance on OpenStack via HEAT orchestration
+    This is HOT Templete to deploy WordPress stack automate on OpenStack by HEAT orchestration
     
 parameters:
     network_name:
@@ -158,14 +158,15 @@ resources:
                       mysql -u root -p$db_password -e ' GRANT ALL PRIVILEGES ON $db_name.* TO $wp_username@"%"; '
                       mysql -u root -p$db_password -e ' FLUSH PRIVILEGES; '
                       sed -i 's/bind-address*/# bind-address/g' /etc/mysql/mysql.conf.d/mysqld.cnf
-                      service mysql restart
+                      systemctl enable mysql
+                      systemctl restart mysql
                   params:
                       $db_name: {get_param: database_name}
                       $db_password: {get_param: database_password}
                       $wp_username: {get_param: wordpress_username}
                       $wp_password: {get_param: wordpress_password}
 
-    wp_instance:
+    wp_dashboard:
         type: OS::Nova::Server
         properties:
             name: wp-dashboard
@@ -173,7 +174,7 @@ resources:
             image: { get_param: image_name }
             flavor: { get_param: flavor_name }
             networks:
-                - port: { get_resource: wp_instance_port }
+                - port: { get_resource: wp_dashboard_port }
             user_data:
                 str_replace:
                     template: |
@@ -181,16 +182,17 @@ resources:
                         apt-get install unzip apache2 php7.0 php7.0-gd php7.0-mysql libapache2-mod-php7.0 -y
                         wget http://wordpress.org/latest.zip -O /tmp/latest.zip
                         unzip -q /tmp/latest.zip -d /var/www/html/
-                        chown -R www-data:www-data /var/www/html/wordpress
-                        chmod -R 755 /var/www/html/wordpress
                         mkdir -p /var/www/html/wordpress/wp-content/uploads
+                        chown -R www-data:www-data /var/www/html/wordpress
                         chown -R www-data:www-data /var/www/html/wordpress/wp-content/uploads
+                        chmod -R 755 /var/www/html/wordpress
+                        rm -f /tmp/latest.zip
                         systemctl enable apache2
                         systemctl restart apache2
                     params:
                         $db_name: {get_param: database_name}
     
-    wp_instance_port:
+    wp_dashboard_port:
         type: OS::Neutron::Port
         properties:
             network_id: { get_resource: wp_network }
@@ -206,17 +208,17 @@ resources:
                 - subnet: { get_resource: wp_subnet }
             security_groups: [{ get_resource: wp_security_ping_ssh_group }, { get_resource: wp_security_http_group }, { get_resource: wp_security_mysql_group }]
     
-    wp_instance_floating_ip:
+    wp_dashboard_floating_ip:
         type: OS::Neutron::FloatingIP
         properties:
             floating_network: { get_param: public_network }
-            port_id: { get_resource: wp_instance_port }
+            port_id: { get_resource: wp_dashboard_port }
 
 
 outputs:
     wp_dashboard_ip:
         description: Network detail for wordpress dashboard
-        value: { get_attr: [wp_instance, networks, opsta-network] }
+        value: { get_attr: [wp_dashboard, networks, opsta-network] }
     wp_database_ip:
         description: Network detail for wordpress database
         value: { get_attr: [wp_database, networks, opsta-network] }
