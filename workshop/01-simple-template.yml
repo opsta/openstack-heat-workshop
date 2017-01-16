@@ -1,0 +1,11 @@
+heat_template_version: newton
+
+description: Create Cirros instance
+
+resources:
+  instance:
+    type: OS::Nova::Server
+    properties:
+      name: cirros-heat
+      image: cirros-0.3.4-x86_64
+      flavor: c1.m1

@@ -1,0 +1,45 @@
+heat_template_version: newton
+
+description: Create Cirros instance and assign floating ip
+
+resources:
+  instance:
+    type: OS::Nova::Server
+    properties:
+      name: cirros-heat
+      image: cirros-0.3.4-x86_64
+      flavor: c1.m1
+      key_name: { get_resource: key_pair }
+      security_groups:
+        - { get_resource: security_group_ping_ssh }
+      networks:
+        - network: opsta-network
+
+  security_group_ping_ssh:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: opsta-ping-ssh
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+  key_pair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: my_key
+      public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuCi8o29fDdmo3b0LcWZmAHn83Anv5wrYpJSiv7QGlog567nFMhfTKpv3f1OBHHYhIHCNwasciw8JUu9tR270idhAXjtSyFW2d59YGKO+PLVGBOWpjRGbTQMrrGeOZ8PT/tRKZzYYJOvNQoDn+smjPZsHNB929LFdIlfyu1iUPd7DR4KLONIwB2glLtKpesQm01fqSo1clRK5NFKu6UH8iIowTTLorSDkVSSg2rxIj+7z5zvDuGaTyxRmfH36Z7YftSBDloG9aY73MWq5dQPOAWD2OIggP2CmypTuPwZ/a+nHgiJNKCblDygm4b0DaTFts3LJUYCpP6pW7+p8qq69D training@opsta
+
+  floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: external-network
+
+  associate_floating_ip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: floating_ip }
+      port_id: { get_attr: [instance, addresses, opsta-network, 0, port] }

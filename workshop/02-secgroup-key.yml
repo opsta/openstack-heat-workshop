@@ -1,0 +1,16 @@
+heat_template_version: newton
+
+description: Create Cirros instance with key and security group
+
+resources:
+  instance:
+    type: OS::Nova::Server
+    properties:
+      name: cirros-heat
+      image: cirros-0.3.4-x86_64
+      flavor: c1.m1
+      key_name: my_key
+      security_groups:
+        - ping-ssh
+      networks:
+        - network: opsta-network
