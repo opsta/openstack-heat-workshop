@@ -43,7 +43,7 @@ parameters:
     image_name:
         type: string
         description: Name of image to use for instance creation
-        default: xenial-server-cloudimg-amd64-20170104
+        default: ubuntu-xenial
     flavor_name:
         type: string
         description: Name of flavor to use for instance creation
@@ -51,7 +51,7 @@ parameters:
     key_name:
         type: string
         description: Keyname to be paired with new instance
-        default: root-aio
+        default: my-key
     database_name:
         type: string
         description: Name of datebase
@@ -142,7 +142,9 @@ resources:
       properties:
           name: wp-database
           key_name: { get_param: key_name }
-          image: { get_param: image_name }
+          block_device_mapping_v2:
+              - image: { get_param: image_name }
+                volume_size: 8
           flavor: { get_param: flavor_name }
           networks:
               - port: { get_resource: wp_database_port }
@@ -171,7 +173,9 @@ resources:
         properties:
             name: wp-dashboard
             key_name: { get_param: key_name }
-            image: { get_param: image_name }
+            block_device_mapping_v2:
+                - image: { get_param: image_name }
+                  volume_size: 8
             flavor: { get_param: flavor_name }
             networks:
                 - port: { get_resource: wp_dashboard_port }
