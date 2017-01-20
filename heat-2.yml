@@ -1,0 +1,84 @@
+heat_template_version: newton
+
+description: Create Cirros Instance
+
+parameters:
+  image_name:
+    type: string
+    description: Image Name
+    default: cirros
+  flavor:
+    type: string
+    description: Flavor
+    default: c1.m1
+  key_name:
+    type: string
+    description: Key Name
+    default: my-key
+  project_network:
+    type: string
+    description: Project Network
+    default: opsta-network
+  external_network:
+    type: string
+    description: External Network
+    default: external-network
+
+resources:
+  server_cirros_heat:
+    type: OS::Nova::Server
+    properties:
+      name: cirros-heat
+      image: { get_param: image_name }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key_name }
+      networks:
+        - network: { get_param: project_network }
+      security_groups:
+        - { get_resource: security_group_ping_ssh }
+        - { get_resource: security_group_http_https }
+
+  security_group_ping_ssh:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: opsta-heat-ping-ssh
+      rules:
+        - port_range_min: 22
+          port_range_max: 22
+          protocol: tcp
+          remote_ip_prefix: 0.0.0.0/0
+        - protocol: icmp
+          remote_ip_prefix: 0.0.0.0/0
+
+  security_group_http_https:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: opsta-heat-http-https
+      rules:
+        - port_range_min: 80
+          port_range_max: 80
+          protocol: tcp
+          remote_ip_prefix: 0.0.0.0/0
+        - port_range_min: 443
+          port_range_max: 443
+          protocol: tcp
+          remote_ip_prefix: 0.0.0.0/0
+
+  floating_ip_cirros_heat:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: external_network }
+
+  floating_ip_association_cirros_heat:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: floating_ip_cirros_heat }
+      port_id: { get_attr: [server_cirros_heat, addresses, opsta-network, 0, port] }
+
+outputs:
+  instance_ip:
+    description: Instance Details
+    value: { get_attr: [floating_ip_cirros_heat, fixed_ip_address] }
+  floating_ip:
+    description: Floating IP Details
+    value: { get_attr: [floating_ip_cirros_heat, floating_ip_address] }

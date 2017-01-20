@@ -1,0 +1,74 @@
+heat_template_version: newton
+
+description: Create Cirros instance
+
+parameters:
+  image_name:
+    type: string
+    description: Image Name
+    default: cirros
+  flavor_name:
+    type: string
+    description: Flavor Name
+    default: c1.m1
+  project_network_name:
+    type: string
+    description: Project Network Name
+    default: opsta-network
+  external_network_name:
+    type: string
+    description: External Network Name
+    default: external-network
+
+resources:
+  cirros_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: external_network_name }
+
+  cirros_associate_floating_ip:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: cirros_floating_ip }
+      port_id: { get_attr: [cirros_second_instance, addresses, opsta-network, 0, port] }
+
+  cirros_second_instance:
+    type: OS::Nova::Server
+    properties:
+      name: cirros-heat
+      image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      key_name: { get_resource: key_pair_opsta }
+      networks:
+        - network: { get_param: project_network_name }
+      security_groups:
+        - { get_resource: security_group_ping_ssh }
+
+  security_group_ping_ssh:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: heat-ping-ssh
+      rules:
+        - protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+          remote_ip_prefix: 0.0.0.0/0
+        - protocol: icmp
+          remote_ip_prefix: 0.0.0.0/0
+
+  key_pair_opsta:
+    type: OS::Nova::KeyPair
+    properties:
+      name: opsta-key
+      public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuCi8o29fDdmo3b0LcWZmAHn83Anv5wrYpJSiv7QGlog567nFMhfTKpv3f1OBHHYhIHCNwasciw8JUu9tR270idhAXjtSyFW2d59YGKO+PLVGBOWpjRGbTQMrrGeOZ8PT/tRKZzYYJOvNQoDn+smjPZsHNB929LFdIlfyu1iUPd7DR4KLONIwB2glLtKpesQm01fqSo1clRK5NFKu6UH8iIowTTLorSDkVSSg2rxIj+7z5zvDuGaTyxRmfH36Z7YftSBDloG9aY73MWq5dQPOAWD2OIggP2CmypTuPwZ/a+nHgiJNKCblDygm4b0DaTFts3LJUYCpP6pW7+p8qq69D training@opsta
+
+outputs:
+  image_name:
+    description: Image Name
+    value: { get_param: image_name }
+  instance_ip:
+    description: Instance IP Address
+    value: { get_attr: [cirros_second_instance, addresses, opsta-network, 0, addr] }
+  floating_ip:
+    description: Floating IP
+    value: { get_attr: [cirros_second_instance, addresses, opsta-network, 1, addr] }
