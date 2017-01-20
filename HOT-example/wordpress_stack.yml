@@ -2,7 +2,7 @@ heat_template_version: newton
 
 description: >
     This is HOT Templete to deploy WordPress stack automate on OpenStack by HEAT orchestration
-    
+
 parameters:
     network_name:
         type: string
@@ -87,14 +87,14 @@ resources:
                   end: { get_param: allocation_pools_end }
             gateway_ip: { get_param: network_gateway }
             dns_nameservers: { get_param: network_dns_nameservers }
-            
+
     wp_router:
         type: OS::Neutron::Router
         properties:
             name: { get_param: router_name }
             external_gateway_info:
                 network: { get_param: public_network }
-                
+
     wp_router_interface:
         type: OS::Neutron::RouterInterface
         properties:
@@ -112,7 +112,7 @@ resources:
                   port_range_max: 22
                 - remote_ip_prefix: 0.0.0.0/0
                   protocol: icmp
-    
+
     wp_security_http_group:
         type: OS::Neutron::SecurityGroup
         properties:
@@ -126,7 +126,7 @@ resources:
                   protocol: tcp
                   port_range_min: 443
                   port_range_max: 443
-      
+
     wp_security_mysql_group:
         type: OS::Neutron::SecurityGroup
         properties:
@@ -141,7 +141,7 @@ resources:
       type: OS::Nova::Server
       properties:
           name: wp-database
-          key_name: { get_param: key_name }
+          key_name: { get_resource: wp_keypair }
           block_device_mapping_v2:
               - image: { get_param: image_name }
                 volume_size: 8
@@ -172,7 +172,7 @@ resources:
         type: OS::Nova::Server
         properties:
             name: wp-dashboard
-            key_name: { get_param: key_name }
+            key_name: { get_resource: wp_keypair }
             block_device_mapping_v2:
                 - image: { get_param: image_name }
                   volume_size: 8
@@ -195,7 +195,13 @@ resources:
                         systemctl restart apache2
                     params:
                         $db_name: {get_param: database_name}
-    
+
+    wp_keypair:
+      type: OS::Nova::KeyPair
+      properties:
+        name: wp-key
+        public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDdIb4GsKmqWD4RtIUy9k/PoDfvJDqJw/+c5sKPr0s4a9YVDZoLcv0k/mS039OBpR8ZPTj4SpBBpRp1j3OL0xj3Jg8PEyYWk/UOhxs3guyJdN0dEeMvf88EpMPl0ejawQv8+HVftRhgg70gg7I7N5lI+uOrxHgal9OSdfsxkP6ct4qL0+kYInJOt2xreWHtBL6loiM7kkSV733PzKUD6C0gCVkhUDYgEnRI5wrVyZv71P2ro+IU+5xloXQg3MTqdqSb1KS8gCoxTeaw5HPPyua+YpY8vgPZoUVCJsPG9GUGSA5Un1COzVD8FgKLP5D7k15Sf5Ei1ZziCcZSuPD/Ic7J winggundamth@WingE6410
+
     wp_dashboard_port:
         type: OS::Neutron::Port
         properties:
@@ -203,7 +209,7 @@ resources:
             fixed_ips:
                 - subnet: { get_resource: wp_subnet }
             security_groups: [{ get_resource: wp_security_ping_ssh_group }, { get_resource: wp_security_http_group }, { get_resource: wp_security_mysql_group }]
-    
+
     wp_database_port:
         type: OS::Neutron::Port
         properties:
@@ -211,7 +217,7 @@ resources:
             fixed_ips:
                 - subnet: { get_resource: wp_subnet }
             security_groups: [{ get_resource: wp_security_ping_ssh_group }, { get_resource: wp_security_http_group }, { get_resource: wp_security_mysql_group }]
-    
+
     wp_dashboard_floating_ip:
         type: OS::Neutron::FloatingIP
         properties:

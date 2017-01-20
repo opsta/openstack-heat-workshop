@@ -14,7 +14,7 @@ parameters:
   key_name:
     type: string
     description: Key Name
-    default: my-key
+    default: dear
   project_network:
     type: string
     description: Project Network
@@ -25,13 +25,22 @@ parameters:
     default: external-network
 
 resources:
+  keypair_cirros_heat:
+    type: OS::Nova::KeyPair
+    properties:
+      name: my-key
+      public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDdIb4GsKmqWD4RtIUy9k/PoDfvJDqJw/+c5sKPr0s4a9YVDZoLcv0k/mS039OBpR8ZPTj4SpBBpRp1j3OL0xj3Jg8PEyYWk/UOhxs3guyJdN0dEeMvf88EpMPl0ejawQv8+HVftRhgg70gg7I7N5lI+uOrxHgal9OSdfsxkP6ct4qL0+kYInJOt2xreWHtBL6loiM7kkSV733PzKUD6C0gCVkhUDYgEnRI5wrVyZv71P2ro+IU+5xloXQg3MTqdqSb1KS8gCoxTeaw5HPPyua+YpY8vgPZoUVCJsPG9GUGSA5Un1COzVD8FgKLP5D7k15Sf5Ei1ZziCcZSuPD/Ic7J winggundamth@WingE6410
+
   server_cirros_heat:
     type: OS::Nova::Server
     properties:
       name: cirros-heat
-      image: { get_param: image_name }
+      block_device_mapping_v2:
+        - device_name: vda
+          volume_size: 2
+          image: { get_param: image_name }
       flavor: { get_param: flavor }
-      key_name: { get_param: key_name }
+      key_name: { get_resource: keypair_cirros_heat }
       networks:
         - network: { get_param: project_network }
       security_groups:
