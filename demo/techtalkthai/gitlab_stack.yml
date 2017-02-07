@@ -92,8 +92,10 @@ resources:
             sed -i 's#^ExecStart=.*#ExecStart=/usr/bin/dockerd -H fd:// --live-restore --storage-driver overlay2 --registry-mirror https://registry-mirror.winginfotech.net #g' /lib/systemd/system/docker.service
             systemctl daemon-reload
             systemctl restart docker.service
-            wget https://gitlab.com/gitlab-org/omnibus-gitlab/raw/master/docker/docker-compose.yml
-            docker-compose up
+            wget -O docker-compose.yml https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/gitlab-docker-compose.yml
+            docker-compose up -d
+          params:
+            $dummy:
 
 outputs:
     gitlab_server_floating_ip:
