@@ -1,0 +1,7 @@
+---
+parameters:
+  public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDdIb4GsKmqWD4RtIUy9k/PoDfvJDqJw/+c5sKPr0s4a9YVDZoLcv0k/mS039OBpR8ZPTj4SpBBpRp1j3OL0xj3Jg8PEyYWk/UOhxs3guyJdN0dEeMvf88EpMPl0ejawQv8+HVftRhgg70gg7I7N5lI+uOrxHgal9OSdfsxkP6ct4qL0+kYInJOt2xreWHtBL6loiM7kkSV733PzKUD6C0gCVkhUDYgEnRI5wrVyZv71P2ro+IU+5xloXQg3MTqdqSb1KS8gCoxTeaw5HPPyua+YpY8vgPZoUVCJsPG9GUGSA5Un1COzVD8FgKLP5D7k15Sf5Ei1ZziCcZSuPD/Ic7J winggundamth@WingE6410
+  flavor_name: linux.c2.m4
+  image_name: xenial-server-cloudimg-amd64-disk1-20170204-opsta
+  external_network: external-network
+  project_network: development-network
