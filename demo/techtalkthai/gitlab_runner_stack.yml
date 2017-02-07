@@ -7,7 +7,7 @@ parameters:
   project_network:
     type: string
     description: Name of private network to be created
-    default: development-network
+    default: project-network
   external_network:
     type: string
     description: Name of public network to allocate floating ips
@@ -20,10 +20,10 @@ parameters:
     type: string
     description: Name of flavor to use for instance creation
     default: c1.m1
-  public_key:
+  public_key_name:
     type: string
-    description: Public Key to assign to instance
-    default: ssh-rsa MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUpwmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ51s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQAB sample@key
+    description: Public Key name
+    default: gitlab-key
   ci_server_url:
     type: string
     description: GitLab CI Server URL
@@ -32,11 +32,6 @@ parameters:
     description: GitLab CI Runner Token
 
 resources:
-  gitlab_runner_keypair:
-    type: OS::Nova::KeyPair
-    properties:
-      name: gitlab-key
-      public_key: { get_param: public_key }
 
   gitlab_runner_security_ping_ssh_group:
     type: OS::Neutron::SecurityGroup
@@ -50,20 +45,6 @@ resources:
         - remote_ip_prefix: 0.0.0.0/0
           protocol: icmp
 
-  gitlab_runner_security_http_group:
-    type: OS::Neutron::SecurityGroup
-    properties:
-      name: http-https
-      rules:
-        - remote_ip_prefix: 0.0.0.0/0
-          protocol: tcp
-          port_range_min: 80
-          port_range_max: 80
-        - remote_ip_prefix: 0.0.0.0/0
-          protocol: tcp
-          port_range_min: 443
-          port_range_max: 443
-
   gitlab_runner_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
@@ -73,30 +54,29 @@ resources:
     type: OS::Neutron::FloatingIPAssociation
     properties:
       floatingip_id: { get_resource: gitlab_runner_floating_ip }
-      port_id: { get_attr: [gitlab_runner_server, addresses, development-network, 0, port] }
+      port_id: { get_attr: [gitlab_runner_server, addresses, operation-network, 0, port] }
 
   gitlab_runner_server:
     type: OS::Nova::Server
     properties:
-      name: gitlab
+      name: gitlab-runner
       block_device_mapping_v2:
         - device_name: vda
           volume_size: 16
           image: { get_param: image_name }
       flavor: { get_param: flavor_name }
-      key_name: { get_resource: gitlab_runner_keypair }
+      key_name: { get_param: public_key_name }
       networks:
         - network: { get_param: project_network }
       security_groups:
         - { get_resource: gitlab_runner_security_ping_ssh_group }
-        - { get_resource: gitlab_runner_security_http_group }
       user_data:
         str_replace:
           template: |
             #!/bin/bash
             curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-ci-multi-runner/script.deb.sh | bash
             apt-get install -y gitlab-ci-multi-runner
-            gitlab-ci-multi-runner register -n -u $CI_SERVER_URL -r $RUNNER_TOKEN --executor shell
+            gitlab-ci-multi-runner register -n -u $CI_SERVER_URL -r $RUNNER_TOKEN --executor shell --name gitlab-runner
           params:
             $CI_SERVER_URL: { get_param: ci_server_url }
             $RUNNER_TOKEN: { get_param: runner_token }
@@ -104,4 +84,4 @@ resources:
 outputs:
     gitlab_runner_server_floating_ip:
         description: GitLab Runner Server Floating IP
-        value: { get_attr: [gitlab_runner_server, networks, development-network, 1] }
+        value: { get_attr: [gitlab_runner_server, networks, operation-network, 1] }
