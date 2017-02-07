@@ -1,6 +1,11 @@
 gitlab:
-  image: 'gitlab/gitlab-ce:latest'
+  image: gitlab/gitlab-ce:latest
   restart: always
+  hostname: "${FLOATING_IP}"
+  environment:
+    GITLAB_OMNIBUS_CONFIG: |
+      external_url "http://${FLOATING_IP}"
+      gitlab_rails['gitlab_shell_ssh_port'] = 2224
   ports:
     - '80:80'
     - '443:443'

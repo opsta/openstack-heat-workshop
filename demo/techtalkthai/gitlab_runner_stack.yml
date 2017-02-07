@@ -1,7 +1,7 @@
 heat_template_version: newton
 
 description: >
-    This is HOT Templete to deploy GitLab on OpenStack by HEAT orchestration
+    This is HOT Templete to deploy GitLab Runner on OpenStack by HEAT orchestration
 
 parameters:
   project_network:
@@ -24,16 +24,21 @@ parameters:
     type: string
     description: Public Key to assign to instance
     default: ssh-rsa MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUpwmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ51s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQAB sample@key
-
+  ci_server_url:
+    type: string
+    description: GitLab CI Server URL
+  runner_token:
+    type: string
+    description: GitLab CI Runner Token
 
 resources:
-  gitlab_keypair:
+  gitlab_runner_keypair:
     type: OS::Nova::KeyPair
     properties:
       name: gitlab-key
       public_key: { get_param: public_key }
 
-  gitlab_security_ping_ssh_group:
+  gitlab_runner_security_ping_ssh_group:
     type: OS::Neutron::SecurityGroup
     properties:
       name: ping-ssh
@@ -45,7 +50,7 @@ resources:
         - remote_ip_prefix: 0.0.0.0/0
           protocol: icmp
 
-  gitlab_security_http_group:
+  gitlab_runner_security_http_group:
     type: OS::Neutron::SecurityGroup
     properties:
       name: http-https
@@ -59,18 +64,18 @@ resources:
           port_range_min: 443
           port_range_max: 443
 
-  gitlab_floating_ip:
+  gitlab_runner_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
       floating_network: { get_param: external_network }
 
-  gitlab_floating_ip_association:
+  gitlab_runner_floating_ip_association:
     type: OS::Neutron::FloatingIPAssociation
     properties:
-      floatingip_id: { get_resource: gitlab_floating_ip }
-      port_id: { get_attr: [gitlab_server, addresses, development-network, 0, port] }
+      floatingip_id: { get_resource: gitlab_runner_floating_ip }
+      port_id: { get_attr: [gitlab_runner_server, addresses, development-network, 0, port] }
 
-  gitlab_server:
+  gitlab_runner_server:
     type: OS::Nova::Server
     properties:
       name: gitlab
@@ -79,25 +84,24 @@ resources:
           volume_size: 16
           image: { get_param: image_name }
       flavor: { get_param: flavor_name }
-      key_name: { get_resource: gitlab_keypair }
+      key_name: { get_resource: gitlab_runner_keypair }
       networks:
         - network: { get_param: project_network }
       security_groups:
-        - { get_resource: gitlab_security_ping_ssh_group }
-        - { get_resource: gitlab_security_http_group }
+        - { get_resource: gitlab_runner_security_ping_ssh_group }
+        - { get_resource: gitlab_runner_security_http_group }
       user_data:
         str_replace:
           template: |
             #!/bin/bash
-            sed -i 's#^ExecStart=.*#ExecStart=/usr/bin/dockerd -H fd:// --live-restore --storage-driver overlay2 --registry-mirror https://registry-mirror.winginfotech.net #g' /lib/systemd/system/docker.service
-            systemctl daemon-reload
-            systemctl restart docker.service
-            wget -O docker-compose.yml https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/gitlab-docker-compose.yml
-            docker-compose up -d
+            curl -L https://packages.gitlab.com/install/repositories/runner/gitlab-ci-multi-runner/script.deb.sh | bash
+            apt-get install -y gitlab-ci-multi-runner
+            gitlab-ci-multi-runner register -n -u $CI_SERVER_URL -r $RUNNER_TOKEN --executor shell
           params:
-            $dummy:
+            $CI_SERVER_URL: { get_param: ci_server_url }
+            $RUNNER_TOKEN: { get_param: runner_token }
 
 outputs:
-    gitlab_server_floating_ip:
-        description: GitLab Server Floating IP
-        value: { get_attr: [gitlab_server, networks, development-network, 1] }
+    gitlab_runner_server_floating_ip:
+        description: GitLab Runner Server Floating IP
+        value: { get_attr: [gitlab_runner_server, networks, development-network, 1] }
