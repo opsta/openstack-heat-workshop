@@ -1,0 +1,101 @@
+heat_template_version: newton
+
+description: >
+    This is HOT Templete to deploy GitLab on OpenStack by HEAT orchestration
+
+parameters:
+  project_network:
+    type: string
+    description: Name of private network to be created
+    default: development-network
+  external_network:
+    type: string
+    description: Name of public network to allocate floating ips
+    default: external-network
+  image_name:
+    type: string
+    description: Name of image to use for instance creation
+    default: ubuntu-xenial
+  flavor_name:
+    type: string
+    description: Name of flavor to use for instance creation
+    default: c1.m1
+  public_key:
+    type: string
+    description: Public Key to assign to instance
+    default: ssh-rsa MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUpwmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ51s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQAB sample@key
+
+
+resources:
+  gitlab_keypair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: gitlab-key
+      public_key: { get_param: public_key }
+
+  gitlab_security_ping_ssh_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: ping-ssh
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+  gitlab_security_http_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: http-https
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 443
+          port_range_max: 443
+
+  gitlab_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: external_network }
+
+  gitlab_floating_ip_association:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: gitlab_floating_ip }
+      port_id: { get_attr: [gitlab_server, addresses, development-network, 0, port] }
+
+  gitlab_server:
+    type: OS::Nova::Server
+    properties:
+      name: gitlab
+      block_device_mapping_v2:
+        - device_name: vda
+          volume_size: 16
+          image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      key_name: { get_resource: gitlab_keypair }
+      networks:
+        - network: { get_param: project_network }
+      security_groups:
+        - { get_resource: gitlab_security_ping_ssh_group }
+        - { get_resource: gitlab_security_http_group }
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            sed -i 's#^ExecStart=.*#ExecStart=/usr/bin/dockerd -H fd:// --live-restore --storage-driver overlay2 --registry-mirror https://registry-mirror.winginfotech.net #g' /lib/systemd/system/docker.service
+            systemctl daemon-reload
+            systemctl restart docker.service
+            wget https://gitlab.com/gitlab-org/omnibus-gitlab/raw/master/docker/docker-compose.yml
+            docker-compose up
+
+outputs:
+    gitlab_server_floating_ip:
+        description: GitLab Server Floating IP
+        value: { get_attr: [gitlab_server, networks, development-network, 1] }
