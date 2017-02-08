@@ -90,8 +90,9 @@ resources:
       name: { get_param: server_name }
       block_device_mapping_v2:
         - device_name: vda
-          volume_size: 16
+          volume_size: 8
           image: { get_param: image_name }
+          delete_on_termination: true
       flavor: { get_param: flavor_name }
       key_name: { get_resource: nginx_keypair }
       networks:
