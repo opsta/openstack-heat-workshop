@@ -1,0 +1,122 @@
+heat_template_version: newton
+
+description: >
+    This is HOT Templete to deploy Nginx on OpenStack by HEAT orchestration
+
+parameters:
+  project_network:
+    type: string
+    description: Name of private network to be created
+    default: project-network
+  external_network:
+    type: string
+    description: Name of public network to allocate floating ips
+    default: external-network
+  image_name:
+    type: string
+    description: Name of image to use for instance creation
+    default: ubuntu-xenial
+  flavor_name:
+    type: string
+    description: Name of flavor to use for instance creation
+    default: c1.m1
+  public_key:
+    type: string
+    description: Public Key to assign to instance
+    default: ssh-rsa MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqGKukO1De7zhZj6+H0qtjTkVxwTCpvKe4eCZ0FPqri0cb2JZfXJ/DgYSF6vUpwmJG8wVQZKjeGcjDOL5UlsuusFncCzWBQ7RKNUSesmQRMSGkVb1/3j+skZ6UtW+5u09lHNsj6tQ51s1SPrCBkedbNf0Tp0GbMJDyR4e9T04ZZwIDAQAB sample@key
+  public_key_name:
+    type: string
+    description: Public Key name
+    default: nginx-key
+  server_name:
+    type: string
+    description: Instance name
+    default: nginx
+  ci_project_url:
+    type: string
+    description: Git clone URL
+  ci_build_ref:
+    type: string
+    description: Git commit id to checkout
+
+
+resources:
+  nginx_keypair:
+    type: OS::Nova::KeyPair
+    properties:
+      name: { get_param: public_key_name }
+      public_key: { get_param: public_key }
+
+  nginx_security_ping_ssh_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: ping-ssh
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 22
+          port_range_max: 22
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: icmp
+
+  nginx_security_http_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: http-https
+      rules:
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 80
+          port_range_max: 80
+        - remote_ip_prefix: 0.0.0.0/0
+          protocol: tcp
+          port_range_min: 443
+          port_range_max: 443
+
+  nginx_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network: { get_param: external_network }
+
+  nginx_floating_ip_association:
+    type: OS::Neutron::FloatingIPAssociation
+    properties:
+      floatingip_id: { get_resource: nginx_floating_ip }
+      port_id: { get_attr: [nginx_server, addresses, staging-network, 0, port] }
+
+  nginx_server:
+    type: OS::Nova::Server
+    properties:
+      name: { get_param: server_name }
+      block_device_mapping_v2:
+        - device_name: vda
+          volume_size: 16
+          image: { get_param: image_name }
+      flavor: { get_param: flavor_name }
+      key_name: { get_resource: nginx_keypair }
+      networks:
+        - network: { get_param: project_network }
+      security_groups:
+        - { get_resource: nginx_security_ping_ssh_group }
+        - { get_resource: nginx_security_http_group }
+      user_data:
+        str_replace:
+          template: |
+            #!/bin/bash
+            sed -i 's#^ExecStart=.*#ExecStart=/usr/bin/dockerd -H fd:// --live-restore --storage-driver overlay2 --registry-mirror https://registry-mirror.winginfotech.net #g' /lib/systemd/system/docker.service
+            systemctl daemon-reload
+            systemctl restart docker.service
+            mkdir -p /var/www
+            git clone $CI_PROJECT_URL /var/www/html
+            cd /var/www/html
+            git checkout $CI_BUILD_REF
+            docker run -d --name nginx -v /var/www/html:/usr/share/nginx/html -p 80:80 --restart=always nginx:1.11.9-alpine
+          params:
+            $CI_PROJECT_URL: { get_param: ci_project_url }
+            $CI_BUILD_REF: { get_param: ci_build_ref }
+
+
+outputs:
+    nginx_server_floating_ip:
+        description: Nginx Floating IP
+        value: { get_attr: [nginx_server, networks, staging-network, 1] }
