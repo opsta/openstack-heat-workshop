@@ -3,6 +3,7 @@ heat_template_version: newton
 description: >
     This is HOT Templete to deploy GitLab Runner on OpenStack by HEAT orchestration
 
+
 parameters:
   project_network:
     type: string
@@ -31,8 +32,8 @@ parameters:
     type: string
     description: GitLab CI Runner Token
 
-resources:
 
+resources:
   gitlab_runner_security_ping_ssh_group:
     type: OS::Neutron::SecurityGroup
     properties:
@@ -80,6 +81,7 @@ resources:
           params:
             $CI_SERVER_URL: { get_param: ci_server_url }
             $RUNNER_TOKEN: { get_param: runner_token }
+
 
 outputs:
     gitlab_runner_server_floating_ip:

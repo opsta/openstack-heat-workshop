@@ -3,6 +3,7 @@ heat_template_version: newton
 description: >
     This is HOT Templete to deploy GitLab on OpenStack by HEAT orchestration
 
+
 parameters:
   project_network:
     type: string
@@ -101,6 +102,7 @@ resources:
             docker-compose up -d
           params:
             $dummy:
+
 
 outputs:
     gitlab_server_floating_ip:

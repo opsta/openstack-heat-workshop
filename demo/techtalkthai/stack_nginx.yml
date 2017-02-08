@@ -3,6 +3,7 @@ heat_template_version: newton
 description: >
     This is HOT Templete to deploy Nginx on OpenStack by HEAT orchestration
 
+
 parameters:
   project_network:
     type: string
