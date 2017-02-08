@@ -16,9 +16,17 @@ deploy_staging:
   stage: deploy
   script:
     - echo "Deploy to staging server"
-    - openstack stack update --parameter "project_network=$OS_PROJECT_NETWORK;server_name=$OS_STACK_NAME;ci_project_url=$CI_PROJECT_URL;ci_build_ref=$CI_BUILD_REF" -t $OS_HEAT_TEMPLATE_URL -e $OS_HEAT_ENV_URL --wait $OS_STACK_NAME
+    - openstack stack show opsta-training-staging &>/dev/null
+        && export STACK_ACTION=update || export STACK_ACTION=create
+    - openstack stack $STACK_ACTION
+        --parameter "project_network=$OS_PROJECT_NETWORK"
+        --parameter "server_name=$OS_STACK_NAME"
+        --parameter "ci_project_url=$CI_PROJECT_URL"
+        --parameter "ci_build_ref=$CI_BUILD_REF"
+        -t $OS_HEAT_TEMPLATE_URL -e $OS_HEAT_ENV_URL --wait $OS_STACK_NAME
     - echo "IP Address of staging server"
-    - openstack stack output show $OS_STACK_NAME nginx_server_floating_ip -f value -c output_value
+    - openstack stack output show $OS_STACK_NAME nginx_server_floating_ip
+        -f value -c output_value
     - echo "Running acceptance tests on staging server"
   environment:
     name: staging
@@ -36,9 +44,17 @@ deploy_prod:
   stage: deploy
   script:
     - echo "Deploy to production server"
-    - openstack stack update --parameter "project_network=$OS_PROJECT_NETWORK;server_name=$OS_STACK_NAME;ci_project_url=$CI_PROJECT_URL;ci_build_ref=$CI_BUILD_REF" -t $OS_HEAT_TEMPLATE_URL -e $OS_HEAT_ENV_URL --wait $OS_STACK_NAME
+    - openstack stack show opsta-training-staging &>/dev/null
+        && export STACK_ACTION=update || export STACK_ACTION=create
+    - openstack stack $STACK_ACTION
+        --parameter "project_network=$OS_PROJECT_NETWORK"
+        --parameter "server_name=$OS_STACK_NAME"
+        --parameter "ci_project_url=$CI_PROJECT_URL"
+        --parameter "ci_build_ref=$CI_BUILD_REF"
+        -t $OS_HEAT_TEMPLATE_URL -e $OS_HEAT_ENV_URL --wait $OS_STACK_NAME
     - echo "IP Address of production server"
-    - openstack stack output show $OS_STACK_NAME nginx_server_floating_ip -f value -c output_value
+    - openstack stack output show $OS_STACK_NAME nginx_server_floating_ip
+        -f value -c output_value
     - echo "Running acceptance tests on production server"
   environment:
     name: production

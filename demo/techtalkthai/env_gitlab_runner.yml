@@ -5,5 +5,5 @@ parameters:
   image_name: xenial-server-cloudimg-amd64-disk1-20170204-opsta
   external_network: external-network
   project_network: operation-network
-  ci_server_url: http://10.77.77.x
-  runner_token: CHANGEME
+  # ci_server_url: http://10.77.77.x
+  # runner_token: CHANGEME
