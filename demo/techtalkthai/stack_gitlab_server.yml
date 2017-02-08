@@ -1,7 +1,7 @@
 heat_template_version: newton
 
 description: >
-    This is HOT Templete to deploy Nginx on OpenStack by HEAT orchestration
+    This is HOT Templete to deploy GitLab on OpenStack by HEAT orchestration
 
 parameters:
   project_network:
@@ -27,27 +27,17 @@ parameters:
   public_key_name:
     type: string
     description: Public Key name
-    default: nginx-key
-  server_name:
-    type: string
-    description: Instance name
-    default: nginx
-  ci_project_url:
-    type: string
-    description: Git clone URL
-  ci_build_ref:
-    type: string
-    description: Git commit id to checkout
+    default: gitlab-key
 
 
 resources:
-  nginx_keypair:
+  gitlab_keypair:
     type: OS::Nova::KeyPair
     properties:
       name: { get_param: public_key_name }
       public_key: { get_param: public_key }
 
-  nginx_security_ping_ssh_group:
+  gitlab_security_ping_ssh_group:
     type: OS::Neutron::SecurityGroup
     properties:
       name: ping-ssh
@@ -59,7 +49,7 @@ resources:
         - remote_ip_prefix: 0.0.0.0/0
           protocol: icmp
 
-  nginx_security_http_group:
+  gitlab_security_http_group:
     type: OS::Neutron::SecurityGroup
     properties:
       name: http-https
@@ -73,32 +63,32 @@ resources:
           port_range_min: 443
           port_range_max: 443
 
-  nginx_floating_ip:
+  gitlab_floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
       floating_network: { get_param: external_network }
 
-  nginx_floating_ip_association:
+  gitlab_floating_ip_association:
     type: OS::Neutron::FloatingIPAssociation
     properties:
-      floatingip_id: { get_resource: nginx_floating_ip }
-      port_id: { get_attr: [nginx_server, addresses, staging-network, 0, port] }
+      floatingip_id: { get_resource: gitlab_floating_ip }
+      port_id: { get_attr: [ gitlab_server, addresses, { get_param: project_network }, 0, port ] }
 
-  nginx_server:
+  gitlab_server:
     type: OS::Nova::Server
     properties:
-      name: { get_param: server_name }
+      name: gitlab
       block_device_mapping_v2:
         - device_name: vda
           volume_size: 16
           image: { get_param: image_name }
       flavor: { get_param: flavor_name }
-      key_name: { get_resource: nginx_keypair }
+      key_name: { get_resource: gitlab_keypair }
       networks:
         - network: { get_param: project_network }
       security_groups:
-        - { get_resource: nginx_security_ping_ssh_group }
-        - { get_resource: nginx_security_http_group }
+        - { get_resource: gitlab_security_ping_ssh_group }
+        - { get_resource: gitlab_security_http_group }
       user_data:
         str_replace:
           template: |
@@ -106,17 +96,13 @@ resources:
             sed -i 's#^ExecStart=.*#ExecStart=/usr/bin/dockerd -H fd:// --live-restore --storage-driver overlay2 --registry-mirror https://registry-mirror.winginfotech.net #g' /lib/systemd/system/docker.service
             systemctl daemon-reload
             systemctl restart docker.service
-            mkdir -p /var/www
-            git clone $CI_PROJECT_URL /var/www/html
-            cd /var/www/html
-            git checkout $CI_BUILD_REF
-            docker run -d --name nginx -v /var/www/html:/usr/share/nginx/html -p 80:80 --restart=always nginx:1.11.9-alpine
+            wget -O docker-compose.yml https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/gitlab-docker-compose.yml
+            export FLOATING_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+            docker-compose up -d
           params:
-            $CI_PROJECT_URL: { get_param: ci_project_url }
-            $CI_BUILD_REF: { get_param: ci_build_ref }
-
+            $dummy:
 
 outputs:
-    nginx_server_floating_ip:
-        description: Nginx Floating IP
-        value: { get_attr: [nginx_server, networks, staging-network, 1] }
+    gitlab_server_floating_ip:
+        description: GitLab Server Floating IP
+        value: { get_attr: [ gitlab_server, networks, { get_param: project_network }, 1 ] }

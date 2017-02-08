@@ -16,7 +16,7 @@ deploy_staging:
   stage: deploy
   script:
     - echo "Deploy to staging server"
-    - openstack stack update --parameter "project_network=staging-network;server_name=opsta-training-staging;ci_project_url=$CI_PROJECT_URL;ci_build_ref=$CI_BUILD_REF" -t nginx_stack.yml -e env_nginx_opsta_training.yml --wait opsta-training-staging
+    - openstack stack update --parameter "project_network=staging-network;server_name=opsta-training-staging;ci_project_url=$CI_PROJECT_URL;ci_build_ref=$CI_BUILD_REF" -t https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/stack_nginx.yml -e https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/env_nginx_opsta_training.yml --wait opsta-training-staging
     - echo "Running acceptance tests on staging server"
   environment:
     name: staging
@@ -25,8 +25,6 @@ deploy_staging:
     OS_USERNAME: "opsta.user"
     OS_PASSWORD: "opstathailand"
     OS_PROJECT_NAME: "staging"
-    OS_AUTH_URL: "https://s.opsta.io:5000/v3"
-    OS_IDENTITY_API_VERSION: "3"
   only:
   - master
 
@@ -34,10 +32,19 @@ deploy_prod:
   stage: deploy
   script:
     - echo "Deploy to production server"
+    - openstack stack update --parameter "project_network=production-network;server_name=opsta-training;ci_project_url=$CI_PROJECT_URL;ci_build_ref=$CI_BUILD_REF" -t https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/stack_nginx.yml -e https://raw.githubusercontent.com/opsta/openstack-heat-workshop/master/demo/techtalkthai/env_nginx_opsta_training.yml --wait opsta-training-production
     - echo "Running acceptance tests on production server"
   environment:
     name: production
     url: http://training.demo.opsta.io
+  variables:
+    OS_USERNAME: "winggundamth"
+    OS_PASSWORD: "OpstaThailand"
+    OS_PROJECT_NAME: "production"
   when: manual
   only:
   - master
+
+variables:
+  OS_AUTH_URL: "https://s.opsta.io:5000/v3"
+  OS_IDENTITY_API_VERSION: "3"
