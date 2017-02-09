@@ -16,7 +16,7 @@ deploy_staging:
   stage: deploy
   script:
     - echo "Deploy to staging server"
-    - openstack stack show opsta-training-staging &>/dev/null
+    - openstack stack show $OS_STACK_NAME &>/dev/null
         && export STACK_ACTION=update || export STACK_ACTION=create
     - openstack stack $STACK_ACTION
         --parameter "project_network=$OS_PROJECT_NETWORK"
@@ -44,7 +44,7 @@ deploy_prod:
   stage: deploy
   script:
     - echo "Deploy to production server"
-    - openstack stack show opsta-training-staging &>/dev/null
+    - openstack stack show $OS_STACK_NAME &>/dev/null
         && export STACK_ACTION=update || export STACK_ACTION=create
     - openstack stack $STACK_ACTION
         --parameter "project_network=$OS_PROJECT_NETWORK"
