@@ -6,7 +6,10 @@ stages:
 
 unit_test:
   stage: unit test
-  script: echo "Running unit tests"
+  script:
+    - echo "Running unit tests"
+    - grep "OpenStack Expert" index.html &>/dev/null
+        && echo "Test passed" || exit 1
 
 build:
   stage: build
