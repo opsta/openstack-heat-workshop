@@ -1,0 +1,52 @@
+heat_template_version: newton
+
+description: Create Cirros instance
+
+parameters:
+  flavor:
+    type: string
+    default: c1.m1
+  network:
+    type: string
+    default: opsta-network
+  key_name:
+    type: string
+    default: my-key
+  image:
+    type: string
+    default: cirros
+
+resources:
+  server_cirros_heat:
+    type: OS::Nova::Server
+    properties:
+      name: cirros-heat
+      networks:
+        - network: { get_param: network }
+      flavor: { get_param: flavor }
+      security_groups:
+        - { get_resource: securitygroup_ping_ssh }
+      key_name: { get_param: key_name }
+      block_device_mapping_v2:
+        - volume_size: 1
+          image: { get_param: image }
+
+  securitygroup_ping_ssh:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: opsta-ping-ssh
+      rules:
+        - protocol: icmp
+          remote_ip_prefix: 0.0.0.0/0
+        - protocol: tcp
+          remote_ip_prefix: 0.0.0.0/0
+          port_range_min: 22
+          port_range_max: 22
+
+outputs:
+  server:
+    description: Server Output
+    value: { get_attr: [server_cirros_heat] }
+  server_ip:
+    description: Server IP Address
+    value: { get_attr: [server_cirros_heat, first_address] }
